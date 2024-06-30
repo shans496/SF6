@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Street Fighter6 DB</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'your_app/styles.css' %}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            function updateMoveNames() {
+                var character = $('#character').val();
+                var move_type = $('#move_type').val();
+                var selected_move_name = "{{ selected_move_name|escapejs }}";
+                if (character && move_type) {
+                    $.ajax({
+                        url: '{% url "get_move_names" %}',
+                        data: {
+                            'character': character,
+                            'move_type': move_type
+                        },
+                        success: function(data) {
+                            var move_name_select = $('#move_name');
+                            move_name_select.empty();
+                            move_name_select.append('<option value="">選択してください</option>');
+                            data.move_names.forEach(function(move_name) {
+                                move_name_select.append('<option value="' + move_name + '">' + move_name + '</option>');
+                            });
+                            move_name_select.val(selected_move_name);
+                        }
+                    });
+                }
+            }
+
+            function updateStrengthAndDerivative() {
+                var character = $('#character').val();
+                var move_type = $('#move_type').val();
+                var move_name = $('#move_name').val();
+                var selected_strength = "{{ selected_strength|escapejs }}";
+                var selected_derivative = "{{ selected_derivative|escapejs }}";
+                if (character && move_type && move_name) {
+                    $.ajax({
+                        url: '{% url "get_strengths_and_derivatives" %}',
+                        data: {
+                            'character': character,
+                            'move_type': move_type,
+                            'move_name': move_name
+                        },
+                        success: function(data) {
+                            var strength_select = $('#strength');
+                            var derivative_select = $('#derivative');
+                            strength_select.empty();
+                            derivative_select.empty();
+
+                            if (data.strengths.length > 0) {
+                                strength_select.append('<option value="">選択してください</option>');
+                                data.strengths.forEach(function(strength) {
+                                    strength_select.append('<option value="' + strength + '">' + strength + '</option>');
+                                });
+                                $('#strength_container').show();
+                                strength_select.val(selected_strength);
+                            } else {
+                                $('#strength_container').hide();
+                            }
+
+                            if (data.derivatives.length > 0) {
+                                derivative_select.append('<option value="">選択してください</option>');
+                                data.derivatives.forEach(function(derivative) {
+                                    derivative_select.append('<option value="' + derivative + '">' + derivative + '</option>');
+                                });
+                                $('#derivative_container').show();
+                                derivative_select.val(selected_derivative);
+                            } else {
+                                $('#derivative_container').hide();
+                            }
+                        }
+                    });
+                }
+            }
+
+            $('#character, #move_type').change(function() {
+                updateMoveNames();
+            });
+
+            $('#move_name').change(function() {
+                updateStrengthAndDerivative();
+            });
+
+            // ページ読み込み時の初期表示設定
+            if (!{{ has_strength|yesno:"true,false" }}) {
+                $('#strength_container').hide();
+            }
+            if (!{{ has_derivative|yesno:"true,false" }}) {
+                $('#derivative_container').hide();
+            }
+
+            // ページ読み込み時に既に選択されている場合の強度と派生の更新
+            if ($('#move_name').val()) {
+                updateStrengthAndDerivative();
+            }
+
+            // ページ読み込み時にキャラクターと技タイプが選択されている場合の技名の更新
+            if ($('#character').val() && $('#move_type').val()) {
+                updateMoveNames();
+            }
+        });
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Street Fighter6 DB</h1>
+        <nav>
+            <ul>
+                <li><a href="#">フレームデータ検索</a></li>
+            </ul>
+        </nav>
+    </header>
+    <main>
+        <form method="post">
+            {% csrf_token %}
+            <label for="character">キャラクター:</label>
+            <select name="character" id="character">
+                <option value="">選択してください</option>
+                {% for character in characters %}
+                <option value="{{ character }}" {% if character == selected_character %}selected{% endif %}>{{ character }}</option>
+                {% endfor %}
+            </select>
+            <br>
+
+            <label for="move_type">技タイプ:</label>
+            <select name="move_type" id="move_type">
+                <option value="">選択してください</option>
+                {% for move_type in move_types %}
+                <option value="{{ move_type }}" {% if move_type == selected_move_type %}selected{% endif %}>{{ move_type }}</option>
+                {% endfor %}
+            </select>
+            <br>
+
+            <label for="move_name">技名:</label>
+            <select name="move_name" id="move_name">
+                <option value="">選択してください</option>
+                {% for move_name in move_names %}
+                <option value="{{ move_name }}" {% if move_name == selected_move_name %}selected{% endif %}>{{ move_name }}</option>
+                {% endfor %}
+            </select>
+            <br>
+
+            <div id="strength_container">
+                <label for="strength">強度:</label>
+                <select name="strength" id="strength">
+                    <option value="">選択してください</option>
+                    {% for strength in strengths %}
+                    <option value="{{ strength }}" {% if strength == selected_strength %}selected{% endif %}>{{ strength }}</option>
+                    {% endfor %}
+                </select>
+                <br>
+            </div>
+
+            <div id="derivative_container">
+                <label for="derivative">派生:</label>
+                <select name="derivative" id="derivative">
+                    <option value="">選択してください</option>
+                    {% for derivative in derivatives %}
+                    <option value="{{ derivative }}" {% if derivative == selected_derivative %}selected{% endif %}>{{ derivative }}</option>
+                    {% endfor %}
+                </select>
+                <br>
+            </div>
+
+            <button type="submit" class="search-button">検索</button>
+        </form>
+
+        {% if move_data %}
+        <h2>技のデータ</h2>
+        <table border="1">
+            <tr>
+                <th>技</th>
+                <th>強度</th>
+                <th>派生</th>
+                <th>発生</th>
+                <th>持続</th>
+                <th>硬直</th>
+                <th>硬直差(ヒット)</th>
+                <th>硬直差(ガード)</th>
+                <th>属性</th>
+            </tr>
+            {% for data in move_data %}
+            <tr>
+                <td>{{ data.技 }}</td>
+                <td>{{ data.強度|default_if_none:"ーーー" }}</td>
+                <td>{{ data.派生|default_if_none:"ーーー" }}</td>
+                <td>{{ data.発生 }}</td>
+                <td>{{ data.持続 }}</td>
+                <td>{{ data.硬直 }}</td>
+                <td>{{ data.硬直差ヒット }}</td>
+                <td>{{ data.硬直差ガード }}</td>
+                <td>{{ data.属性 }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+    </main>
+</body>
+</html>
